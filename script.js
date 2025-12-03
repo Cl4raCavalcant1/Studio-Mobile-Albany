@@ -32,7 +32,7 @@ function toggleTheme() {
 }
 
 /* ===========================================================
-   HOME — Mostra os agendamentos de hoje
+   HOME — Mostra os agendamentos de hoje + NOTIFICAÇÃO
 =========================================================== */
 function renderHome() {
     const hoje = new Date().toISOString().slice(0, 10);
@@ -60,10 +60,20 @@ function renderHome() {
     }
 
     content.innerHTML = html;
+
+    /* 📢 NOVO — Notificação simples mostrando clientes do dia */
+    if (Notification.permission !== "denied") {
+        Notification.requestPermission().then(p => {
+            if (p === "granted" && agHoje.length) {
+                const nomes = agHoje.map(x => `${x.hora} — ${x.clienteNome}`).join("\n");
+                new Notification("Agendamentos de hoje", { body: nomes });
+            }
+        });
+    }
 }
 
 /* ===========================================================
-   AGENDA — Com horários disponíveis + remarcar
+   AGENDA — Com horários disponíveis + remarcar + PESQUISA
 =========================================================== */
 function renderAgenda() {
     content.innerHTML = `
@@ -97,17 +107,21 @@ function renderAgenda() {
 
     <div class='card'>
         <h3>📌 Agendamentos do Dia</h3>
+
+        <!-- NOVO: campo de busca -->
+        <input id="ag_search" placeholder="Pesquisar cliente..." oninput="showAgendaList()" />
+
         <input type="date" id="ag_filter" onchange="showAgendaList()">
         <div id="ag_list" style="margin-top:15px">Selecione uma data</div>
     </div>
     `;
 }
 
-/* Horários fixos do estúdio */
-const HORARIOS = [
-    "08:00","09:00","10:00","11:00",
-    "13:00","14:00","15:00","16:00","17:00"
-];
+/* ✔ NOVO — Horários 09:00 → 20:00 */
+const HORARIOS = [];
+for (let h = 9; h <= 20; h++) {
+    HORARIOS.push(String(h).padStart(2, "0") + ":00");
+}
 
 /* Carregar horários livres */
 function carregarHorarios() {
@@ -150,13 +164,17 @@ function saveAgenda() {
     showAgendaList();
 }
 
-/* Listar agendamentos */
+/* Listar agendamentos com busca */
 function showAgendaList() {
     const d = ag_filter.value;
     if (!d) return;
 
-    const list = AG.filter(x => x.data === d)
-                   .sort((a,b)=>a.hora.localeCompare(b.hora));
+    const termo = (ag_search.value || "").toLowerCase(); // NOVO
+
+    const list = AG.filter(x =>
+        x.data === d &&
+        x.clienteNome.toLowerCase().includes(termo)
+    ).sort((a,b)=>a.hora.localeCompare(b.hora));
 
     if (!list.length) {
         ag_list.innerHTML = "<p>Nenhum agendamento.</p>";
@@ -209,7 +227,7 @@ function delAgenda(id) {
 }
 
 /* ===========================================================
-   CLIENTES
+   CLIENTES — COM BUSCA
 =========================================================== */
 function renderClientes() {
     content.innerHTML = `
@@ -233,6 +251,10 @@ function renderClientes() {
 
     <div class="card">
         <h3>📄 Lista de Clientes</h3>
+
+        <!-- NOVO: campo de busca -->
+        <input id="c_search" placeholder="Pesquisar cliente..." oninput="showClientes()">
+
         <div id="c_list"></div>
     </div>
     `;
@@ -257,7 +279,11 @@ function saveCliente() {
 }
 
 function showClientes() {
-    if (!CL.length) {
+    const termo = (c_search.value || "").toLowerCase(); // NOVO
+
+    const lista = CL.filter(c => c.nome.toLowerCase().includes(termo));
+
+    if (!lista.length) {
         c_list.innerHTML = "<p>Nenhum cliente cadastrado.</p>";
         return;
     }
@@ -269,7 +295,7 @@ function showClientes() {
         <th>Ações</th>
     </tr></thead><tbody>`;
 
-    CL.forEach(c => {
+    lista.forEach(c => {
         html += `
         <tr>
             <td>${c.nome}</td>
